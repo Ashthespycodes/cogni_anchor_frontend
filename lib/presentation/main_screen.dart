@@ -1,5 +1,5 @@
 import 'package:cogni_anchor/presentation/constants/colors.dart' as colors;
-import 'package:cogni_anchor/presentation/screens/chatbot_page.dart';
+import 'package:cogni_anchor/presentation/screens/chatbot_page_functional.dart';
 import 'package:cogni_anchor/presentation/screens/face_recog/fr_intro_page.dart';
 import 'package:cogni_anchor/presentation/screens/reminder_page.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   final orange = colors.appColor;
 
-  final List<Widget> _pages = [ReminderPage(), Container(color: Colors.green), ChatbotPage(), FacialRecognitionPage(), Container(color: Colors.red)];
+  final List<Widget> _pages = [ReminderPage(), Container(color: Colors.green), ChatbotPageFunctional(), FacialRecognitionPage(), Container(color: Colors.red)];
 
   @override
   Widget build(BuildContext context) {
