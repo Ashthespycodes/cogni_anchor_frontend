@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python:*)",
+      "Bash(curl:*)",
+      "Bash(git clone:*)",
+      "Bash(cd:*)",
+      "Bash(cat:*)",
+      "Bash(clip:*)",
+      "Bash(flutter devices:*)",
+      "Bash(dir:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter run:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /F /IM qemu-system-x86_64.exe\")",
+      "Bash(adb devices:*)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
