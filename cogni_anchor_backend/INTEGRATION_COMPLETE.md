@@ -110,11 +110,11 @@ Your `.env` file now includes:
 
 ```env
 # Gemini API (for chatbot)
-GEMINI_API_KEY=AIzaSyAHilJSGRTsRctQcZ9cGgepkPhdJQa0Tlg
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Supabase Configuration
-SUPABASE_URL=https://joayctkupytsedmpfyng.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
 # SUPABASE_SERVICE_KEY=<optional - for admin operations>
 
 # Server Configuration
