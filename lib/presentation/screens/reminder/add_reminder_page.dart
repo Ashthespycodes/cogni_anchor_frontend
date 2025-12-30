@@ -95,11 +95,8 @@ class _AddReminderPageState extends State<AddReminderPage> {
       time: formattedTime,
     );
 
-    // Dispatch event
+    // Dispatch event - navigation will happen in listener on success
     context.read<ReminderBloc>().add(AddReminder(newReminder));
-
-    // ✅ IMMEDIATE NAVIGATION BACK
-    Navigator.pop(context);
   }
 
   Widget _buildDateTimePicker({
@@ -144,6 +141,9 @@ class _AddReminderPageState extends State<AddReminderPage> {
         if (state is ReminderError) {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(state.message)));
+        } else if (state is RemindersLoaded) {
+          // Successfully added reminder - navigate back
+          Navigator.pop(context);
         }
       },
       child: Scaffold(

@@ -1,5 +1,4 @@
 import 'package:cogni_anchor/presentation/screens/reminder/bloc/reminder_bloc.dart'; // NEW
-import 'package:cogni_anchor/models/reminder_model.dart';
 import 'package:cogni_anchor/presentation/constants/colors.dart' as colors;
 import 'package:cogni_anchor/presentation/screens/reminder/add_reminder_page.dart';
 import 'package:cogni_anchor/presentation/widgets/common/app_text.dart';
@@ -37,11 +36,13 @@ class _ReminderPageState extends State<ReminderPage> {
         height: 60,
         child: FloatingActionButton(
           onPressed: () {
+            // Capture the bloc before navigation
+            final bloc = context.read<ReminderBloc>();
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => BlocProvider.value(
-                  value: context.read<ReminderBloc>(),
+                builder: (navContext) => BlocProvider.value(
+                  value: bloc,
                   child: const AddReminderPage(),
                 ),
               ),

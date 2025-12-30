@@ -57,6 +57,50 @@ class _AppInitializerState extends State<AppInitializer> {
     }
   }
 
+  /// Ensure a pair exists for the user (migration fix for existing users)
+  Future<void> _ensurePairExists(String userId, UserModel role) async {
+    try {
+      final client = Supabase.instance.client;
+
+      if (role == UserModel.patient) {
+        // Check if pair already exists for patient
+        final existingPair = await client
+            .from('pairs')
+            .select('id')
+            .eq('patient_user_id', userId)
+            .maybeSingle();
+
+        // Create pair if it doesn't exist
+        if (existingPair == null) {
+          await client.from('pairs').insert({
+            'patient_user_id': userId,
+            // caretaker_user_id is null initially
+          });
+          debugPrint("✅ Created missing pair for patient: $userId");
+        }
+      } else if (role == UserModel.caretaker) {
+        // Check if pair already exists for caretaker
+        final existingPair = await client
+            .from('pairs')
+            .select('id')
+            .eq('caretaker_user_id', userId)
+            .maybeSingle();
+
+        // Create pair if it doesn't exist
+        if (existingPair == null) {
+          await client.from('pairs').insert({
+            'patient_user_id': userId, // Caretaker is their own "patient"
+            'caretaker_user_id': userId,
+          });
+          debugPrint("✅ Created missing pair for caretaker: $userId");
+        }
+      }
+    } catch (e) {
+      debugPrint("⚠️ Failed to ensure pair exists: $e");
+      // Don't throw - continue app initialization
+    }
+  }
+
   Future<Widget> _resolveStartScreen() async {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
@@ -81,7 +125,11 @@ class _AppInitializerState extends State<AppInitializer> {
     final role = UserModel.values.firstWhere(
       (e) => e.name == data['role'],
     );
-    // 🛂 PATIENT PERMISSION CHECK
+
+    // ✅ ENSURE PAIR EXISTS - Create if missing (migration fix)
+    await _ensurePairExists(user.id, role);
+
+    // 🛂 PATIENT PERMISSION CHECK - Only show if no decision made yet
     if (role == UserModel.patient) {
       final status = await client
           .from('patient_status')
@@ -89,11 +137,9 @@ class _AppInitializerState extends State<AppInitializer> {
           .eq('patient_user_id', user.id)
           .maybeSingle();
 
-      final locationGranted = status?['location_permission'] == true;
-      final micGranted = status?['mic_permission'] == true;
-
-      // 🔔 Show permission screen if not decided yet
-      if (!locationGranted || !micGranted) {
+      // Only show permission screen if patient_status doesn't exist yet
+      // Once they've seen the screen, let them continue regardless of choice
+      if (status == null) {
         return const PatientPermissionsScreen();
       }
     }
@@ -136,7 +182,7 @@ class _AppInitializerState extends State<AppInitializer> {
     final user = client.auth.currentUser;
     if (user == null) return;
 
-    // patient
+    // patient - check if pair exists, create if not
     final patientPair = await client
         .from('pairs')
         .select('id')
@@ -145,6 +191,24 @@ class _AppInitializerState extends State<AppInitializer> {
 
     if (patientPair != null) {
       PairContext.set(patientPair['id']);
+      return;
+    }
+
+    // Check if user is a patient by looking up their role
+    final userData = await client
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    // If user is a patient and no pair exists, create one
+    if (userData != null && userData['role'] == 'patient') {
+      final newPair = await client
+          .from('pairs')
+          .insert({'patient_user_id': user.id})
+          .select()
+          .single();
+      PairContext.set(newPair['id']);
       return;
     }
 

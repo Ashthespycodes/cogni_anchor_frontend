@@ -4,6 +4,7 @@ import 'package:cogni_anchor/presentation/widgets/chatbot_page/quick_chip.dart';
 import 'package:cogni_anchor/presentation/widgets/chatbot_page/toggle_button.dart';
 import 'package:cogni_anchor/presentation/widgets/common/app_text.dart';
 import 'package:cogni_anchor/services/chatbot_service.dart';
+import 'package:cogni_anchor/services/conversation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatbotPageFunctional extends StatefulWidget {
   const ChatbotPageFunctional({super.key});
@@ -23,7 +25,8 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
   bool isAudio = false; // Start with text mode
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
+  final ConversationService _conversationService = ConversationService();
+  List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
   // Voice recording
@@ -33,20 +36,18 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
   bool _recorderInitialized = false;
   String? _recordingPath;
 
-  // For demo, use a default patient ID
-  // In production, get this from user login/session
-  final String patientId = "demo_patient_001";
+  // Get actual user ID from Supabase auth
+  String get patientId {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user?.id ?? "demo_patient_001";
+  }
 
   @override
   void initState() {
     super.initState();
     _initRecorder();
-    // Add initial bot message
-    _messages.add(ChatMessage(
-      text: "Hi! I'm your cognitive health companion. How can I help you today?",
-      isBot: true,
-      timestamp: DateTime.now(),
-    ));
+    // Load existing conversation from service
+    _messages = _conversationService.getConversation(patientId);
   }
 
   Future<void> _initRecorder() async {
@@ -84,12 +85,16 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
   Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
+    final userMessage = ChatMessage(
+      text: message,
+      isBot: false,
+      timestamp: DateTime.now(),
+    );
+
+    _conversationService.addMessage(patientId, userMessage);
+
     setState(() {
-      _messages.add(ChatMessage(
-        text: message,
-        isBot: false,
-        timestamp: DateTime.now(),
-      ));
+      _messages = _conversationService.getConversation(patientId);
       _isLoading = true;
     });
 
@@ -102,26 +107,38 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
         message: message,
       );
 
-      setState(() {
-        _messages.add(ChatMessage(
+      if (mounted) {
+        final botMessage = ChatMessage(
           text: response,
           isBot: true,
           timestamp: DateTime.now(),
-        ));
-        _isLoading = false;
-      });
+        );
 
-      _scrollToBottom();
+        _conversationService.addMessage(patientId, botMessage);
+
+        setState(() {
+          _messages = _conversationService.getConversation(patientId);
+          _isLoading = false;
+        });
+
+        _scrollToBottom();
+      }
     } catch (e) {
-      setState(() {
-        _messages.add(ChatMessage(
+      if (mounted) {
+        final errorMessage = ChatMessage(
           text: "Sorry, I couldn't process your message. Please check your connection and try again.",
           isBot: true,
           timestamp: DateTime.now(),
           isError: true,
-        ));
-        _isLoading = false;
-      });
+        );
+
+        _conversationService.addMessage(patientId, errorMessage);
+
+        setState(() {
+          _messages = _conversationService.getConversation(patientId);
+          _isLoading = false;
+        });
+      }
 
       _scrollToBottom();
 
@@ -218,12 +235,16 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
   }
 
   Future<void> _sendVoiceMessage(String audioPath) async {
+    final voiceMessage = ChatMessage(
+      text: "🎤 Voice message sent",
+      isBot: false,
+      timestamp: DateTime.now(),
+    );
+
+    _conversationService.addMessage(patientId, voiceMessage);
+
     setState(() {
-      _messages.add(ChatMessage(
-        text: "🎤 Voice message sent",
-        isBot: false,
-        timestamp: DateTime.now(),
-      ));
+      _messages = _conversationService.getConversation(patientId);
       _isLoading = true;
     });
 
@@ -239,21 +260,29 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
         filename: 'voice_message.aac',
       );
 
-      setState(() {
-        // Update the voice message with transcription
-        _messages[_messages.length - 1] = ChatMessage(
-          text: "🎤 ${response['transcription']}",
-          isBot: false,
-          timestamp: _messages[_messages.length - 1].timestamp,
-        );
+      // Remove the temporary voice message and add the transcribed one
+      final messages = _conversationService.getConversation(patientId);
+      messages.removeLast();
 
-        // Add bot response
-        _messages.add(ChatMessage(
-          text: response['response'] as String,
-          isBot: true,
-          timestamp: DateTime.now(),
-          audioUrl: response['audio_url'] as String?,
-        ));
+      final transcribedMessage = ChatMessage(
+        text: "🎤 ${response['transcription']}",
+        isBot: false,
+        timestamp: voiceMessage.timestamp,
+      );
+
+      _conversationService.addMessage(patientId, transcribedMessage);
+
+      final botMessage = ChatMessage(
+        text: response['response'] as String,
+        isBot: true,
+        timestamp: DateTime.now(),
+        audioUrl: response['audio_url'] as String?,
+      );
+
+      _conversationService.addMessage(patientId, botMessage);
+
+      setState(() {
+        _messages = _conversationService.getConversation(patientId);
         _isLoading = false;
       });
 
@@ -267,13 +296,17 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
         }
       }
     } catch (e) {
+      final errorMessage = ChatMessage(
+        text: "Sorry, I couldn't process your voice message. Please try again.",
+        isBot: true,
+        timestamp: DateTime.now(),
+        isError: true,
+      );
+
+      _conversationService.addMessage(patientId, errorMessage);
+
       setState(() {
-        _messages.add(ChatMessage(
-          text: "Sorry, I couldn't process your voice message. Please try again.",
-          isBot: true,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
+        _messages = _conversationService.getConversation(patientId);
         _isLoading = false;
       });
 
@@ -651,13 +684,9 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
+              _conversationService.clearConversation(patientId);
               setState(() {
-                _messages.clear();
-                _messages.add(ChatMessage(
-                  text: "Chat cleared! How can I help you today?",
-                  isBot: true,
-                  timestamp: DateTime.now(),
-                ));
+                _messages = _conversationService.getConversation(patientId);
               });
             },
           ),
@@ -667,18 +696,3 @@ class _ChatbotPageFunctionalState extends State<ChatbotPageFunctional> {
   }
 }
 
-class ChatMessage {
-  final String text;
-  final bool isBot;
-  final DateTime timestamp;
-  final bool isError;
-  final String? audioUrl;
-
-  ChatMessage({
-    required this.text,
-    required this.isBot,
-    required this.timestamp,
-    this.isError = false,
-    this.audioUrl,
-  });
-}

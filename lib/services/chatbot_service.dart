@@ -1,12 +1,38 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatbotService {
   // Backend API URL - Change this to your computer's IP address when testing on real device
   // For emulator, use 10.0.2.2 (Android emulator's special alias for localhost)
   static const String baseUrl = "http://10.0.2.2:8000";
 
-  /// Send text message to chatbot
+  /// Get pair_id for current user
+  static Future<String?> _getPairId() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return null;
+
+    // Check if user is a patient
+    final patient = await client
+        .from('pairs')
+        .select('id')
+        .eq('patient_user_id', user.id)
+        .maybeSingle();
+
+    if (patient != null) return patient['id'].toString();
+
+    // Check if user is a caretaker
+    final caretaker = await client
+        .from('pairs')
+        .select('id')
+        .eq('caretaker_user_id', user.id)
+        .maybeSingle();
+
+    return caretaker?['id']?.toString();
+  }
+
+  /// Send text message to chatbot with agent capabilities (reminders, alerts, etc.)
   ///
   /// [patientId] - Unique identifier for the patient
   /// [message] - User's text message
@@ -17,15 +43,22 @@ class ChatbotService {
     required String message,
   }) async {
     try {
-      final url = Uri.parse('$baseUrl/api/v1/chat/message');
+      // Get pair_id for the current user
+      final pairId = await _getPairId();
+      if (pairId == null) {
+        throw Exception('No patient-caretaker pair found. Please complete setup.');
+      }
+
+      // Use agent endpoint for tool-calling capabilities (reminders, alerts, etc.)
+      final url = Uri.parse('$baseUrl/api/v1/agent/chat');
 
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'patient_id': patientId,
+          'pair_id': pairId,
           'message': message,
-          'mode': 'text',
         }),
       ).timeout(
         const Duration(seconds: 30),

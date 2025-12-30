@@ -58,6 +58,9 @@ class _PatientPermissionsScreenState extends State<PatientPermissionsScreen> {
 
       if (!foregroundStatus.isGranted) {
         await _updateLocationPermission(false);
+        if (mounted) {
+          setState(() => _locationGranted = false);
+        }
         return;
       }
 
@@ -68,9 +71,13 @@ class _PatientPermissionsScreenState extends State<PatientPermissionsScreen> {
 
       await _updateLocationPermission(granted);
 
-      setState(() => _locationGranted = granted);
+      if (mounted) {
+        setState(() => _locationGranted = granted);
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -89,18 +96,36 @@ class _PatientPermissionsScreenState extends State<PatientPermissionsScreen> {
 
       final granted = status.isGranted;
 
-      setState(() => _micGranted = granted);
+      if (mounted) {
+        setState(() => _micGranted = granted);
+      }
 
       await _client.from('patient_status').update({
         'mic_permission': granted,
       }).eq('patient_user_id', _client.auth.currentUser!.id);
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  // ✅ Continue only if at least location permission is decided
+  // ✅ Continue - save decision to database even if denied
   Future<void> _continue() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    // Ensure patient_status record exists with current permission states
+    try {
+      await _client.from('patient_status').upsert({
+        'patient_user_id': user.id,
+        'location_permission': _locationGranted,
+        'mic_permission': _micGranted,
+      });
+    } catch (e) {
+      debugPrint('Error saving permission state: $e');
+    }
+
     await PatientStatusService.updateLastActive();
 
     if (!mounted) return;

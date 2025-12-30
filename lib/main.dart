@@ -1,4 +1,4 @@
-import 'package:cogni_anchor/presentation/main_screen.dart';
+import 'package:cogni_anchor/presentation/screens/app_initializer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -13,7 +13,7 @@ class CogniAnchor extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScreenUtilInit(
       designSize: Size(390, 844),
-      child: const MaterialApp(debugShowCheckedModeBanner: false, home: MainScreen()),
+      child: const MaterialApp(debugShowCheckedModeBanner: false, home: AppInitializer()),
     );
   }
 }
